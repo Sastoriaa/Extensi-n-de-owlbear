@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Canción de los Caídos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600&family=EB+Garamond:ital@0;1&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --pergamino: #EDE3CC;
+    --crema: #F4ECD8;
+    --tinta: #211C1E;
+    --tinta-suave: #5c5346;
+    --carmesi: #7C2233;
+    --oro: #A9822E;
+    --borde: #B8A97C;
+    --panel: #221B22;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'EB Garamond', Georgia, serif;
+    background: var(--pergamino);
+    color: var(--tinta);
+    font-size: 14px;
+  }
+  #app { padding: 10px; }
+  h1 {
+    font-family: 'Cinzel', serif;
+    font-size: 15px;
+    letter-spacing: .06em;
+    text-align: center;
+    margin: 2px 0 8px;
+  }
+  .tabs { display: flex; gap: 4px; margin-bottom: 10px; flex-wrap: wrap; }
+  .tab {
+    flex: 1; min-width: 62px; padding: 5px 4px; font: inherit; font-size: 12px;
+    border: 1px solid var(--borde); background: var(--crema); color: var(--tinta);
+    border-radius: 4px; cursor: pointer;
+  }
+  .tab.on { background: var(--carmesi); color: var(--crema); border-color: var(--carmesi); }
+  .banda {
+    background: var(--panel); color: var(--crema); font-family: 'Cinzel', serif;
+    font-size: 11px; letter-spacing: .05em; padding: 4px 8px; border-radius: 3px;
+    margin: 10px 0 6px;
+  }
+  .card { background: var(--crema); border: 1px solid var(--borde); border-radius: 6px; padding: 8px; margin-bottom: 6px; }
+  label.lbl { display: block; font-size: 9px; letter-spacing: .06em; text-transform: uppercase; color: var(--carmesi); font-weight: 600; margin-bottom: 2px; }
+  input, select, textarea {
+    width: 100%; font: inherit; font-size: 13px; padding: 3px 5px;
+    background: var(--pergamino); border: 1px solid var(--borde); border-radius: 3px; color: var(--tinta);
+  }
+  input:focus, select:focus, textarea:focus { outline: 1px solid var(--carmesi); }
+  button.btn {
+    font: inherit; font-size: 12px; padding: 4px 8px; cursor: pointer;
+    background: var(--crema); border: 1px solid var(--borde); border-radius: 4px; color: var(--tinta);
+  }
+  button.btn:hover { background: var(--pergamino); }
+  button.btn.fuerte { background: var(--carmesi); color: var(--crema); border-color: var(--carmesi); }
+  .fila { display: flex; gap: 6px; align-items: flex-end; }
+  .fila > * { flex: 1; min-width: 0; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+  .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .mini { font-size: 11px; color: var(--tinta-suave); font-style: italic; line-height: 1.35; }
+  .stat { text-align: center; }
+  .stat .val { font-size: 18px; font-weight: 600; }
+  .stat .pool { font-size: 10px; color: var(--tinta-suave); }
+  .pip { width: 15px; height: 15px; border: 1px solid var(--borde); border-radius: 3px; background: var(--pergamino); cursor: pointer; padding: 0; }
+  .pip.on { background: var(--carmesi); border-color: var(--carmesi); }
+  .chip {
+    display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 9px;
+    border: 1px solid var(--carmesi); color: var(--carmesi); margin: 1px 2px 1px 0; cursor: pointer; background: transparent;
+    font-family: inherit;
+  }
+  .chip.on { background: var(--carmesi); color: var(--crema); }
+  .dado {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 30px; height: 30px; border-radius: 6px; margin: 0 4px 4px 0;
+    background: var(--crema); border: 1.5px solid var(--borde);
+    font-weight: 600; font-size: 15px; color: var(--tinta);
+    box-shadow: 0 1px 2px rgba(0,0,0,.18);
+  }
+  .dado.alto { background: var(--carmesi); color: var(--crema); border-color: var(--carmesi); }
+  .dado.rodando { animation: rodar .5s linear infinite; }
+  @keyframes rodar {
+    0%   { transform: translateY(0) rotate(0deg);    }
+    25%  { transform: translateY(-7px) rotate(-16deg); }
+    50%  { transform: translateY(0) rotate(0deg);    }
+    75%  { transform: translateY(-4px) rotate(14deg);  }
+    100% { transform: translateY(0) rotate(0deg);    }
+  }
+  .dado.asentado { animation: asentar .34s ease-out; }
+  @keyframes asentar {
+    0%   { transform: scale(1.34); }
+    60%  { transform: scale(.93); }
+    100% { transform: scale(1); }
+  }
+  .zona-dados { min-height: 38px; display: flex; flex-wrap: wrap; align-items: center; }
+  .forma-activa {
+    display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px;
+    background: var(--carmesi); color: var(--crema); margin-left: 6px;
+  }
+  .efecto {
+    display: flex; gap: 5px; align-items: center; margin-bottom: 4px;
+  }
+  .lectura { font-family: 'Cinzel', serif; font-size: 13px; margin-top: 5px; }
+  .aviso { font-size: 11px; color: var(--carmesi); background: #f0ded0; border: 1px solid rgba(124,34,51,.35); border-radius: 4px; padding: 4px 6px; margin-top: 5px; }
+  .num { text-align: center; }
+  .kpi { background: var(--panel); color: var(--crema); border-radius: 4px; padding: 5px 4px; text-align: center; }
+  .kpi .k { font-size: 9px; text-transform: uppercase; opacity: .7; letter-spacing: .05em; }
+  .kpi .v { font-size: 15px; font-weight: 600; }
+  .fila-pj { border-bottom: 1px solid var(--borde); padding: 5px 0; }
+  .fila-pj:last-child { border-bottom: none; }
+  .barra { height: 5px; border-radius: 3px; background: rgba(0,0,0,.12); overflow: hidden; margin-top: 3px; }
+  .barra > i { display: block; height: 100%; background: var(--carmesi); }
+  .barra.ese > i { background: var(--oro); }
+  .cargando { text-align: center; padding: 30px 10px; color: var(--tinta-suave); font-style: italic; }
+</style>
+</head>
+<body>
+<div id="app"><div class="cargando">Cargando…</div></div>
+<script type="module" src="/main.js"></script>
+</body>
+</html>

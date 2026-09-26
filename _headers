@@ -1,0 +1,18 @@
+/*
+  Access-Control-Allow-Origin: *
+
+/manifest.json
+  Access-Control-Allow-Origin: *
+  Content-Type: application/json
+
+/sistema.js
+  Access-Control-Allow-Origin: *
+  Content-Type: text/javascript
+
+/main.js
+  Access-Control-Allow-Origin: *
+  Content-Type: text/javascript
+
+/icon.svg
+  Access-Control-Allow-Origin: *
+  Content-Type: image/svg+xml

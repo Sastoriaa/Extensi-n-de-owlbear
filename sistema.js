@@ -293,6 +293,8 @@ export const TIPOS_PASIVA = [
   { id: "aura", label: "Los aliados cercanos reciben X% menos daño", unidad: "%", def: 10 },
   { id: "auto_forma", label: "Transformarte automáticamente cuando…", unidad: "", def: 0,
     param: "forma" },
+  { id: "auto_estado", label: "Ponerte un estado automáticamente cuando…", unidad: "", def: 0,
+    param: "auto_estado" },
 ];
 
 // Disparadores de la transformación automática
@@ -638,8 +640,22 @@ export function movimientoMob(m) {
 }
 
 export function habilidadMobNueva() {
-  return { id: uid(), nombre: "", descripcion: "", mult: 1.5, efectos: [],
+  return { id: uid(), nombre: "", descripcion: "", perfil: "estandar", mult: 1.5, efectos: [],
            usos: 0, usosMax: 0, alcance: 1, accion: "accion" };
+}
+
+// Si la habilidad tiene un perfil reconocido, su multiplicador sale de ahí;
+// "personalizado" es el único caso que respeta el número escrito a mano.
+export function multDeHabilidadMob(hh) {
+  if (!hh.perfil || hh.perfil === "personalizado") return Number(hh.mult) || 0;
+  const p = PERFILES_HABILIDAD.find((x) => x.id === hh.perfil);
+  return p ? p.mult : (Number(hh.mult) || 0);
+}
+
+export function esOfensivaMob(hh) {
+  if (!hh.perfil || hh.perfil === "personalizado") return true;
+  const p = PERFILES_HABILIDAD.find((x) => x.id === hh.perfil);
+  return p ? p.ofensiva : true;
 }
 
 export function mobEfectivo(m) {

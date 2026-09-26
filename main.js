@@ -11,6 +11,7 @@ import {
   ecoDesdeMob, costeEco, topeEcos,
   movimientoDe, tirarIniciativa, ordenarIniciativa, distanciaCasillas,
   ALCANCE_INTERPONER, ALCANCE_EMPUJAR, TIPOS_ACCION, habilidadMobNueva, movimientoMob,
+  multDeHabilidadMob, esOfensivaMob,
   DISPAROS, efectoAplica,
   MODOS_CURACION, curar, ESTADOS as LISTA_ESTADOS,
 } from "./sistema.js";
@@ -129,9 +130,10 @@ function cargarFicha() {
 // Si una pasiva de transformación automática se dispara, cambia de forma sola.
 function revisarAutoForma() {
   const pas = (typeof derivar === "function" ? derivar(ficha).pasivas : []) || [];
-  const autos = pas.filter((p) => p.tipo === "auto_forma" && p.forma);
-  if (!autos.length) return false;
+  let cambio = false;
   const d = derivar(ficha);
+
+  const autos = pas.filter((p) => p.tipo === "auto_forma" && p.forma);
   for (const p of autos) {
     if (ficha.formaActiva === p.forma) continue;
     if (condicionCumplida(p, d, ficha)) {
@@ -140,10 +142,42 @@ function revisarAutoForma() {
       const d2 = derivar(ficha);
       if (ficha.pv != null) ficha.pv = clamp(ficha.pv, 0, d2.pvMax);
       anunciar(`${ficha.nombre} se transforma: ${(fm && fm.nombre) || "otra forma"}`);
-      return true;
+      cambio = true;
+      break;
     }
   }
-  return false;
+
+  // pasivas que aplican un estado solas (p.ej. volverse Invisible al bajar de vida)
+  const autosEstado = pas.filter((p) => p.tipo === "auto_estado" && p.estadoAuto);
+  for (const p of autosEstado) {
+    const est = p.estadoAuto;
+    if ((ficha.estados || []).includes(est)) continue;
+    if (condicionCumplida(p, d, ficha)) {
+      ficha.estados = [...new Set([...(ficha.estados || []), est])];
+      if (est === "invisible") ficha.invisModo = ficha.invisModo || "atacar";
+      anunciar(`${ficha.nombre} queda ${(ESTADOS.find((x) => x.id === est) || {}).label || est} automáticamente.`);
+      cambio = true;
+    }
+  }
+  return cambio;
+}
+
+// Lo mismo, pero para una criatura del Bestiario (solo el DM lo dispara).
+function revisarAutoEstadoMob(m) {
+  const autos = (m.pasivas || []).filter((p) => p.tipo === "auto_estado" && p.estadoAuto);
+  if (!autos.length) return null;
+  const me = mobEfectivo(m);
+  const ctxFicha = { rango: m.rango, grieta: 0, estados: m.estados || [] };
+  const ctxDerivado = { pv: m.pv, pvMax: me.pvMax, esencia: 0, esenciaMax: 1 };
+  for (const p of autos) {
+    const est = p.estadoAuto;
+    if ((m.estados || []).includes(est)) continue;
+    if (condicionCumplida(p, ctxDerivado, ctxFicha)) {
+      const estados = [...new Set([...(m.estados || []), est])];
+      return { ...m, estados };
+    }
+  }
+  return null;
 }
 
 function guardarFicha() {
@@ -552,7 +586,9 @@ async function lanzarGolpe({ deNombre, objetivoId, objetivoNombre, bruto, mobId,
     ts: Date.now(),
   };
   await guardarAtaques({ ...ataques, [g.id]: g });
-  anunciar(`${deNombre} ataca a ${objetivoNombre}: ${bruto} de daño bruto — esperando reacción`);
+  anunciar(bruto > 0
+    ? `${deNombre} ataca a ${objetivoNombre}: ${bruto} de daño bruto — esperando reacción`
+    : `${deNombre} actúa sobre ${objetivoNombre} — esperando reacción`);
 }
 
 // Cierra el golpe y aplica de una sola vez los cambios que haya sufrido el enemigo.
@@ -643,10 +679,16 @@ function panelReacciones() {
 }
 
 async function guardarMobs(siguiente) {
-  mobs = siguiente;
+  // antes de publicar, cada mob revisa si alguna pasiva automática se dispara
+  const conAuto = {};
+  Object.values(siguiente).forEach((m) => {
+    const cambiado = revisarAutoEstadoMob(m);
+    conAuto[m.id] = cambiado || m;
+  });
+  mobs = conAuto;
   if (!dentroDeOwlbear) { render(); return; }
   try {
-    await OBR.room.setMetadata({ [CLAVE_MOBS]: siguiente });
+    await OBR.room.setMetadata({ [CLAVE_MOBS]: conAuto });
   } catch (e) { console.warn("no se pudieron guardar los mobs", e); }
 }
 
@@ -1355,11 +1397,14 @@ function editorPasivas(pasivas, prefijo) {
         ${tp.param === "estado" ? `<select data-pas="${prefijo}|${k}" data-pask="estado" style="max-width:96px">${ESTADOS.map((e) => `<option value="${e.id}" ${p.estado === e.id ? "selected" : ""}>${e.label}</option>`).join("")}</select>` : ""}
         <button class="btn" data-quitar-pas="${prefijo}|${k}" style="flex:0 0 auto;padding:2px 6px">×</button>
       </div>
-      ${tp.param === "forma" ? `<div class="fila" style="margin:3px 0 0 10px">
-        <select data-pas="${prefijo}|${k}" data-pask="forma" style="max-width:130px">
+      ${(tp.param === "forma" || tp.param === "auto_estado") ? `<div class="fila" style="margin:3px 0 0 10px">
+        ${tp.param === "forma" ? `<select data-pas="${prefijo}|${k}" data-pask="forma" style="max-width:130px">
           <option value="">— elige forma —</option>
           ${(ficha.formas || []).map((fm) => `<option value="${fm.id}" ${p.forma === fm.id ? "selected" : ""}>${esc(fm.nombre || "sin nombre")}</option>`).join("")}
-        </select>
+        </select>` : ""}
+        ${tp.param === "auto_estado" ? `<select data-pas="${prefijo}|${k}" data-pask="estadoAuto" style="max-width:110px">
+          ${ESTADOS.map((e) => `<option value="${e.id}" ${(p.estadoAuto || "invisible") === e.id ? "selected" : ""}>${e.label}</option>`).join("")}
+        </select>` : ""}
         <select data-pas="${prefijo}|${k}" data-pask="cond">
           ${CONDICIONES.map((c) => `<option value="${c.id}" ${(p.cond || "pv_bajo") === c.id ? "selected" : ""}>${c.label}</option>`).join("")}
         </select>
@@ -2075,7 +2120,7 @@ function vistaBestiario() {
             ${m.habilidades.map((hh, j) => {
               const agot = (hh.usosMax || 0) > 0 && (hh.usos || 0) >= hh.usosMax;
               const ta = TIPOS_ACCION.find((t) => t.id === (hh.accion || "accion"));
-              return `<option value="${j}" ${habSel === String(j) ? "selected" : ""} ${agot ? "disabled" : ""}>${esc(hh.nombre || "Habilidad " + (j + 1))} · ${Math.ceil(me.dano * (Number(hh.mult) || 1))} · alc ${hh.alcance != null ? hh.alcance : 1}${hh.usosMax ? ` · ${hh.usos || 0}/${hh.usosMax}` : ""}${hh.accion && hh.accion !== "accion" ? ` · ${ta ? ta.corta : ""}` : ""}${agot ? " · AGOTADA" : ""}</option>`;
+              return `<option value="${j}" ${habSel === String(j) ? "selected" : ""} ${agot ? "disabled" : ""}>${esc(hh.nombre || "Habilidad " + (j + 1))} · ${esOfensivaMob(hh) ? `${Math.ceil(me.dano * multDeHabilidadMob(hh))} · ` : ""}alc ${hh.alcance != null ? hh.alcance : 1}${hh.usosMax ? ` · ${hh.usos || 0}/${hh.usosMax}` : ""}${hh.accion && hh.accion !== "accion" ? ` · ${ta ? ta.corta : ""}` : ""}${agot ? " · AGOTADA" : ""}</option>`;
             }).join("")}
           </select>
         </div>` : ""}
@@ -2115,7 +2160,17 @@ function vistaBestiario() {
                 ${tp.unidad ? `<input class="num" data-mpas="${m.id}|${k}" data-mpask="valor" type="number" value="${p.valor}" style="max-width:60px">` : ""}
                 ${tp.param === "estado" ? `<select data-mpas="${m.id}|${k}" data-mpask="estado" style="max-width:92px">${ESTADOS.map((e) => `<option value="${e.id}" ${p.estado === e.id ? "selected" : ""}>${e.label}</option>`).join("")}</select>` : ""}
                 <button class="btn" data-quitar-mpas="${m.id}|${k}" style="flex:0 0 auto;padding:2px 6px">×</button>
-              </div>`;
+              </div>
+              ${tp.param === "auto_estado" ? `<div class="fila" style="margin:3px 0 0 10px">
+                <select data-mpas="${m.id}|${k}" data-mpask="estadoAuto" style="max-width:110px">
+                  ${ESTADOS.map((e) => `<option value="${e.id}" ${(p.estadoAuto || "invisible") === e.id ? "selected" : ""}>${e.label}</option>`).join("")}
+                </select>
+                <select data-mpas="${m.id}|${k}" data-mpask="cond">
+                  ${CONDICIONES.map((c) => `<option value="${c.id}" ${(p.cond || "pv_bajo") === c.id ? "selected" : ""}>${c.label}</option>`).join("")}
+                </select>
+                ${(CONDICIONES.find((c) => c.id === (p.cond || "pv_bajo")) || {}).unidad
+                  ? `<input class="num" data-mpas="${m.id}|${k}" data-mpask="umbral" type="number" value="${p.umbral != null ? p.umbral : 50}" style="max-width:58px">` : ""}
+              </div>` : ""}`;
             }).join("")}
             <button class="btn" data-add-mpas="${m.id}" style="margin-top:4px;padding:2px 8px">+ pasiva</button>
 
@@ -2123,7 +2178,11 @@ function vistaBestiario() {
             ${(m.habilidades || []).map((hh, j) => `
               <div class="fila" style="margin-top:4px">
                 <input data-mhab="${m.id}|${j}" data-mhabk="nombre" value="${esc(hh.nombre || "")}" placeholder="Nombre">
-                <label class="mini" style="display:flex;align-items:center;gap:3px;white-space:nowrap">×<input class="num" data-mhab="${m.id}|${j}" data-mhabk="mult" type="number" step="0.5" value="${hh.mult || 1}" style="max-width:52px"></label>
+                <select data-mhab="${m.id}|${j}" data-mhabk="perfil" style="max-width:118px">
+                  ${PERFILES_HABILIDAD.map((p) => `<option value="${p.id}" ${(hh.perfil || "estandar") === p.id ? "selected" : ""}>${p.label}</option>`).join("")}
+                  <option value="personalizado" ${hh.perfil === "personalizado" ? "selected" : ""}>Personalizado</option>
+                </select>
+                ${hh.perfil === "personalizado" ? `<label class="mini" style="display:flex;align-items:center;gap:3px;white-space:nowrap">×<input class="num" data-mhab="${m.id}|${j}" data-mhabk="mult" type="number" step="0.5" value="${hh.mult || 1}" style="max-width:48px"></label>` : ""}
                 <label class="mini" style="display:flex;align-items:center;gap:3px;white-space:nowrap">usos<input class="num" data-mhab="${m.id}|${j}" data-mhabk="usosMax" type="number" min="0" value="${hh.usosMax || 0}" style="max-width:48px"></label>
                 <label class="mini" style="display:flex;align-items:center;gap:3px;white-space:nowrap">alc<input class="num" data-mhab="${m.id}|${j}" data-mhabk="alcance" type="number" min="0" value="${hh.alcance != null ? hh.alcance : 1}" style="max-width:44px"></label>
                 <select data-mhab="${m.id}|${j}" data-mhabk="accion" style="max-width:112px">
@@ -2132,7 +2191,7 @@ function vistaBestiario() {
                 <button class="btn" data-quitar-mhab="${m.id}|${j}" style="flex:0 0 auto;padding:2px 6px">×</button>
               </div>
               <div class="mini" style="margin-left:10px">
-                pega <b>${Math.ceil(me.dano * (Number(hh.mult) || 1))}</b> bruto${hh.usosMax ? ` · ${hh.usos || 0}/${hh.usosMax} usos` : " · sin límite"}
+                ${esOfensivaMob(hh) ? `pega <b>${Math.ceil(me.dano * multDeHabilidadMob(hh))}</b> bruto` : `<b>Utilidad</b> — no hace daño directo`}${hh.usosMax ? ` · ${hh.usos || 0}/${hh.usosMax} usos` : " · sin límite"}
               </div>
               ${(hh.efectos || []).map((ef, k) => {
                 const te = TIPOS_EFECTO.find((t) => t.id === ef.tipo) || TIPOS_EFECTO[0];
@@ -2516,6 +2575,7 @@ function enlazar() {
       if (t) arr[Number(k)].valor = t.def;
     }
     guardarMobs({ ...mobs, [mid]: { ...m, pasivas: arr } });
+    if (kk === "tipo" || kk === "cond") render();
   });
   app.querySelectorAll("[data-add-mpas]").forEach((b) => b.onclick = () => {
     const m = mobs[b.dataset.addMpas]; if (!m) return;
@@ -2595,6 +2655,7 @@ function enlazar() {
     const jSel = (ficha._habMob || {})[m.id];
     const hab = (jSel !== "" && jSel != null) ? (m.habilidades || [])[Number(jSel)] : null;
     if (hab && (hab.usosMax || 0) > 0 && (hab.usos || 0) >= hab.usosMax) return;
+    const esUtilidad = hab && !esOfensivaMob(hab);
     // economía de acciones de la criatura, igual que la de un personaje
     const tipoAcc = hab ? (hab.accion || "accion") : "accion";
     if (turnos) {
@@ -2611,8 +2672,9 @@ function enlazar() {
       ultimaTirada.resumen = `${etiqueta} falla contra ${p.nombre}`;
       anunciar(ultimaTirada.resumen);
     } else {
-      const mult = hab ? (Number(hab.mult) || 1) : 1;
-      let bruto = roundUp(me.dano * mult) * (r.lectura === "critico" ? 2 : 1);
+      const habOfensiva = hab ? esOfensivaMob(hab) : true;
+      const mult = hab ? multDeHabilidadMob(hab) : 1;
+      let bruto = habOfensiva ? roundUp(me.dano * mult) * (r.lectura === "critico" ? 2 : 1) : 0;
       const efs = hab ? (hab.efectos || []) : [];
       const tieneM = (t) => efs.find((e) => e.tipo === t);
       const extras = [];
@@ -2631,9 +2693,11 @@ function enlazar() {
       const dr = tieneM("drenar_esencia");
       if (dr) extras.push(`drena ${dr.valor}E`);
 
-      ultimaTirada.resumen = `${etiqueta} conecta en ${p.nombre}: ${bruto} bruto` +
-        (r.lectura === "critico" ? " · CRÍTICO ×2" : r.lectura === "costo" ? " (con costo)" : "") +
-        (extras.length ? " · " + extras.join(" · ") : "");
+      ultimaTirada.resumen = esUtilidad
+        ? `${etiqueta} actúa sobre ${p.nombre}` + (extras.length ? " · " + extras.join(" · ") : "")
+        : `${etiqueta} conecta en ${p.nombre}: ${bruto} bruto` +
+          (r.lectura === "critico" ? " · CRÍTICO ×2" : r.lectura === "costo" ? " (con costo)" : "") +
+          (extras.length ? " · " + extras.join(" · ") : "");
 
       // registrar uso y gasto de acción en una sola escritura
       const cambios = { ...m };

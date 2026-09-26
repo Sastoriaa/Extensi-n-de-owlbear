@@ -3799,7 +3799,7 @@ if (OBR.isAvailable) {
         if (miRol === "GM") {
           OBR.contextMenu.create({
             id: "cdlc/vincular-mob",
-            icons: [{ icon: "icon.svg", label: "Ligar al enemigo seleccionado en el Bestiario",
+            icons: [{ icon: "/Extensi-n-de-owlbear/icon.svg", label: "Ligar al enemigo seleccionado en el Bestiario",
                       filter: { every: [{ key: "type", value: "IMAGE" }] } }],
             onClick(ctx) {
               const it = ctx.items[0];
@@ -3815,7 +3815,7 @@ if (OBR.isAvailable) {
         }
         OBR.contextMenu.create({
           id: "cdlc/vincular",
-          icons: [{ icon: "icon.svg", label: "Vincular a mi personaje", filter: { every: [{ key: "type", value: "IMAGE" }] } }],
+          icons: [{ icon: "/Extensi-n-de-owlbear/icon.svg", label: "Vincular a mi personaje", filter: { every: [{ key: "type", value: "IMAGE" }] } }],
           onClick(ctx) {
             const it = ctx.items[0];
             if (it) {

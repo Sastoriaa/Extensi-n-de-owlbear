@@ -4,11 +4,11 @@
   "manifest_version": 1,
   "description": "Fichas, tiradas y bestiario del sistema Canción de los Caídos.",
   "author": "Angel",
-  "icon": "icon.svg",
+  "icon": "/Extensi-n-de-owlbear/icon.svg",
   "action": {
     "title": "Canción de los Caídos",
-    "icon": "icon.svg",
-    "popover": "index.html",
+    "icon": "/Extensi-n-de-owlbear/icon.svg",
+    "popover": "/Extensi-n-de-owlbear/index.html",
     "width": 420,
     "height": 620
   }
